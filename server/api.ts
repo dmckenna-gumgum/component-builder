@@ -66,13 +66,13 @@ Properties:
 ${JSON.stringify(currentComponent?.properties || currentComponent?.config || {}, null, 2)}
 
 HTML:
-${currentComponent?.html || '<!-- No HTML content yet -->'}
+${currentComponent?.html || ''}
 
 CSS:
-${currentComponent?.css || '/* No CSS content yet */'}
+${currentComponent?.css || ''}
 
 JavaScript:
-${currentComponent?.javascript || '// No JavaScript content yet'}
+${currentComponent?.javascript || ''}
 ` : 'No existing component state.'}
 
 Please ${currentComponent ? 'update the above component' : 'create a new component'} according to the following request:
@@ -106,9 +106,9 @@ ${prompt}
             }
           }
         },
-        "html": "<!-- HTML content -->",
-        "css": "/* CSS content */",
-        "javascript": "// JavaScript content"
+        "html": "",
+        "css": "",
+        "javascript": ""
       }
     }
     ---END_COMPONENT_UPDATE---
@@ -122,6 +122,10 @@ ${prompt}
    - Preserve existing property structure and only modify necessary values
    - All changes must maintain backward compatibility
    - Keep property names consistent with existing schema
+   - Never add comments to the JSON that you return.
+   - Never add anything else to the JSON besides the actual properties you've setup
+   - NEVER ADD ANY SPREAD OPERATOR OR ANYTHING ELSE TO THE JSON
+   - ONCE AGAIN, NEVER EVER ADD COMMENTS TO THE JSON!!!!
 
 2. Change Management Rules:
    - Make iterative, additive changes rather than wholesale replacements
@@ -130,6 +134,7 @@ ${prompt}
    - Maintain HTML/CSS/JS structure unless changes are explicitly required
    - Track significant changes in explanation for potential rollback
    - Document any breaking changes or potential side effects
+   - ONCE AGAIN, NEVER EVER ADD COMMENTS TO ANY CODE!!!!
 
 3. Configuration System:
    - Each component has a config object with properties
@@ -137,6 +142,10 @@ ${prompt}
    - Access config values in JavaScript using: window.componentConfig.properties.propertyName.value
    - Properties can be grouped for UI organization using the 'group' field
    - Maintain existing property groups when adding new properties
+   - ONCE AGAIN, NEVER EVER ADD COMMENTS TO THE CONFIG!!!!
+   - NEVER ADD ANY SPREAD OPERATOR OR ANYTHING ELSE TO THE CONFIG
+   - NEVER ADD ANYTHING ELSE TO THE CONFIG THAT IS NOT UPDATED PROPERTIES AND ASSOCIATED INPUTS
+   - ONCE AGAIN, NEVER EVER ADD COMMENTS TO THE CONFIG!!!!
 
 4. Input Types Supported:
    - text: Text input with optional placeholder
@@ -202,28 +211,97 @@ When making changes:
     if (componentUpdateMatch) {
       console.log('Component update found:', componentUpdateMatch[1]);
       try {
-        // Extract and parse the JSON from between the markers
-        const componentJson = componentUpdateMatch[1].trim();
+        // Extract and clean the JSON from between the markers
+        // First clean the overall JSON structure
+        let componentJson = componentUpdateMatch[1].trim()
+          // Remove any comments after property objects
+          .replace(/}\s*,\s*\/\*[\s\S]*?\*\//g, '},')  // Remove /* */ comments after properties
+          .replace(/}\s*,\s*\/\/[^\n]*/g, '},')       // Remove // comments after properties
+          .replace(/}\s*\/\*[\s\S]*?\*\//g, '}')      // Remove /* */ comments after last property
+          .replace(/}\s*\/\/[^\n]*/g, '}')           // Remove // comments after last property
+          .replace(/,(\s*[}\]])/g, '$1');            // Remove trailing commas before } or ]
+
+        // Then clean any JavaScript content to ensure it's valid JSON
+        componentJson = componentJson
+          // First handle any JavaScript properties that might contain template literals
+          .replace(/"(javascript|html|css)"\s*:\s*`([\s\S]*?)`/g, (_, key, content) => {
+            // Properly escape the content and wrap in quotes
+            return `"${key}": ${JSON.stringify(
+              // Clean up the content
+              content
+                .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
+                .replace(/\\t/g, '\t')  // Convert escaped tabs to actual tabs
+                .replace(/\\r/g, '')    // Remove carriage returns
+                .replace(/\${/g, '\\${')  // Escape template expressions
+                .replace(/\$/g, '\\$')    // Escape remaining $ signs
+                .replace(/([^\\])'|^'/g, "$1\\'")
+                .trim()
+            )}`
+          })
+          // Clean up any trailing commas in arrays or objects
+          .replace(/,(?=\s*[}\]])/g, '');
+
+        // Parse the cleaned JSON
+        console.log('Component JSON Cleaned:');
+        console.log(componentJson);
         const parsedResponse = JSON.parse(componentJson);
 
-        // Validate the response structure
-        if (!parsedResponse.component || 
-            !parsedResponse.component.name ||
-            !parsedResponse.component.description ||
-            !parsedResponse.component.version ||
-            !parsedResponse.component.properties ||
-            !parsedResponse.component.html ||
-            !parsedResponse.component.css ||
-            !parsedResponse.component.javascript) {
-          throw new Error('Invalid component structure in response');
+        // Validate and fix the response structure
+        if (!parsedResponse.component) {
+          throw new Error('Missing component in response');
+        }
+
+        // Move any misplaced top-level fields out of properties
+        if (parsedResponse.component.properties?.name) {
+          parsedResponse.component.name = parsedResponse.component.properties.name;
+          delete parsedResponse.component.properties.name;
+        }
+        if (parsedResponse.component.properties?.version) {
+          parsedResponse.component.version = parsedResponse.component.properties.version;
+          delete parsedResponse.component.properties.version;
+        }
+        if (parsedResponse.component.properties?.description) {
+          parsedResponse.component.description = parsedResponse.component.properties.description;
+          delete parsedResponse.component.properties.description;
+        }
+
+        // Ensure required fields exist
+        if (!parsedResponse.component.name || !parsedResponse.component.description || !parsedResponse.component.version) {
+          throw new Error('Missing required component fields');
+        }
+
+        // Validate code fields
+        if (typeof parsedResponse.component.html !== 'string' ||
+            typeof parsedResponse.component.css !== 'string' ||
+            typeof parsedResponse.component.javascript !== 'string') {
+          throw new Error('Invalid code field types');
+        }
+
+        // Handle nested properties structure
+        if (parsedResponse.component.properties?.properties) {
+          parsedResponse.component.properties = {
+            ...parsedResponse.component.properties.properties,
+            ...Object.fromEntries(
+              Object.entries(parsedResponse.component.properties)
+                .filter(([key]) => key !== 'properties')
+            )
+          };
+        } else if (!parsedResponse.component.properties) {
+          parsedResponse.component.properties = currentComponent?.properties || {};
         }
 
         // Get the explanation text that appears before the component update
         const explanation = response.split('---COMPONENT_UPDATE---')[0].trim();
 
+        // Construct the full response with markers
+        const fullResponse = `${explanation}
+                              ---COMPONENT_UPDATE---
+                              ${componentJson}
+                              ---END_COMPONENT_UPDATE---`;
+
         res.status(200).json({
           type: 'component_update',
-          message: explanation,
+          message: fullResponse,
           component: parsedResponse.component
         });
       } catch (parseError) {

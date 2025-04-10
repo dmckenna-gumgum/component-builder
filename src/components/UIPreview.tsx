@@ -95,8 +95,17 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
   const handlePropertyChange = (propertyName: string, newValue: string) => {
     if (!parsedConfig) return;
 
+    // Ensure we're not modifying top-level fields through properties
+    if (['name', 'version', 'description'].includes(propertyName)) {
+      console.warn(`Cannot modify ${propertyName} through properties`);
+      return;
+    }
+
+    // Create new config preserving the correct structure
     const newConfig = {
-      ...parsedConfig,
+      name: parsedConfig.name,
+      version: parsedConfig.version,
+      description: parsedConfig.description,
       properties: {
         ...parsedConfig.properties,
         [propertyName]: {
@@ -119,10 +128,16 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
       ungrouped: { default: [] }
     };
 
+    // Filter and process only valid property objects that have value and input fields
     Object.entries(properties).forEach(([name, prop]) => {
+      if (!prop || typeof prop !== 'object' || !('value' in prop) || !('input' in prop)) {
+        console.warn(`Skipping invalid property: ${name}`);
+        return;
+      }
+
       // Try to infer group from property name if not explicitly set
       const group = prop.group || inferPropertyGroup(name);
-      const subgroup = prop.input.group || 'default';
+      const subgroup = prop.input?.group || 'default';
 
       if (!group) {
         groups.ungrouped.default.push([name, prop]);
@@ -225,7 +240,7 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
         )}
 
         {/* Component Properties */}
-        {Object.entries(groupProperties(parsedConfig.properties)).map(([groupName, groupProps]) => (
+        {Object.entries(groupProperties(parsedConfig?.properties || {})).map(([groupName, groupProps]) => (
           <Box 
             key={groupName} 
             bg="gray.50" 
