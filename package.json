@@ -2,6 +2,7 @@
   "name": "component-builder",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://dmckenna-gumgum.github.io/component-builder",
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
     "@chakra-ui/react": "^2.8.2",

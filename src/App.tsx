@@ -52,8 +52,11 @@ function HomePage() {
 }
 
 function App() {
+  // Use the basename for GitHub Pages
+  const basename = process.env.NODE_ENV === 'production' ? '/component-builder' : '';
+
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/editor/:id" element={<ComponentEditor />} />
