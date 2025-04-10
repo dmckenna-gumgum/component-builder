@@ -22,6 +22,7 @@ import { CodeEditor } from './CodeEditor';
 import { ComponentPreview } from './ComponentPreview';
 import { UIPreview } from './UIPreview';
 import { defaultConfig, defaultHtml, defaultCss, defaultJavascript } from '../templates';
+import { Terminal } from './Terminal';
 
 interface ComponentData {
   id: string;
@@ -184,8 +185,10 @@ export const ComponentEditor = () => {
       >
         {/* Editor Panel */}
         <Panel defaultSize={50} minSize={30}>
-          <Box height="100%" overflow="hidden">
-            <Tabs height="100%" display="flex" flexDirection="column">
+          <VStack height="100%" spacing={0}>
+            {/* Code Editor Tabs */}
+            <Box height="70%" width="100%" overflow="hidden">
+              <Tabs height="100%" display="flex" flexDirection="column">
               <TabList>
                 <Tab>Config</Tab>
                 <Tab>HTML</Tab>
@@ -224,7 +227,21 @@ export const ComponentEditor = () => {
                 </TabPanel>
               </TabPanels>
             </Tabs>
-          </Box>
+            </Box>
+            
+            {/* Terminal Panel */}
+            <Box height="30%" width="100%" borderTopWidth="1px" overflow="hidden">
+              <Terminal
+                onGenerateComponent={(componentData) => {
+                  if (componentData.config) setConfig(componentData.config);
+                  if (componentData.html) setHtml(componentData.html);
+                  if (componentData.css) setCss(componentData.css);
+                  if (componentData.javascript) setJavascript(componentData.javascript);
+                  if (componentData.name) setName(componentData.name);
+                }}
+              />
+            </Box>
+          </VStack>
         </Panel>
 
         <PanelResizeHandle style={{ width: '4px', background: '#E2E8F0' }} />
