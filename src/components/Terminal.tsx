@@ -10,9 +10,18 @@ import {
 
 interface TerminalProps {
   onGenerateComponent: (response: any) => void;
+  currentComponent?: {
+    name?: string;
+    description?: string;
+    version?: string;
+    properties?: Record<string, any>;
+    html?: string;
+    css?: string;
+    javascript?: string;
+  };
 }
 
-export const Terminal: React.FC<TerminalProps> = ({ onGenerateComponent }) => {
+export const Terminal: React.FC<TerminalProps> = ({ onGenerateComponent, currentComponent }) => {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<Array<{ type: 'input' | 'output', content: string }>>([]);
   const terminalEndRef = useRef<HTMLDivElement>(null);
@@ -36,7 +45,10 @@ export const Terminal: React.FC<TerminalProps> = ({ onGenerateComponent }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt: input }),
+        body: JSON.stringify({ 
+          prompt: input,
+          currentComponent: currentComponent || null
+        }),
       });
 
       const data = await response.json();

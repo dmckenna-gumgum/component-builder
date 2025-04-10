@@ -50,29 +50,34 @@ async function callOpenAI(messages: Array<{ role: string; content: string }>) {
 router.post('/generate-component', async (req, res) => {
   try {
     const { prompt, currentComponent } = req.body;
-
-    // Prepare the current component state message
-    let currentStateMessage = '';
-    if (currentComponent) {
-      currentStateMessage = `
+    console.log('Current component:', currentComponent);
+    // Always prepare the current component state message
+    const currentStateMessage = `
 Current Component State:
+${currentComponent ? `
+Component Details:
+${JSON.stringify({
+  name: currentComponent.name || 'ComponentName',
+  description: currentComponent.description || 'Description of the component',
+  version: currentComponent.version || '1.0.0'
+}, null, 2)}
 
-Config:
-${JSON.stringify(currentComponent.config, null, 2)}
+Properties:
+${JSON.stringify(currentComponent?.properties || currentComponent?.config || {}, null, 2)}
 
 HTML:
-${currentComponent.html}
+${currentComponent?.html || '<!-- No HTML content yet -->'}
 
 CSS:
-${currentComponent.css}
+${currentComponent?.css || '/* No CSS content yet */'}
 
 JavaScript:
-${currentComponent.javascript}
+${currentComponent?.javascript || '// No JavaScript content yet'}
+` : 'No existing component state.'}
 
-Please update the above component according to the following request:
+Please ${currentComponent ? 'update the above component' : 'create a new component'} according to the following request:
 ${prompt}
 `;
-    }
 
     // Prepare the system message with component structure context
     const systemMessage = `You are a component generation assistant for a web component builder. You can engage in general conversation AND provide component updates when specifically asked.
@@ -84,7 +89,9 @@ ${prompt}
       "explanation": "Your detailed explanation of changes",
       "component": {
         "name": "ComponentName",
-        "config": {
+        "description": "Description of the component",
+        "version": "1.0.0",
+        "properties": {
           "propertyName": {
             "value": "defaultValue",
             "input": {
@@ -107,58 +114,93 @@ ${prompt}
     ---END_COMPONENT_UPDATE---
 
     Component Architecture Guidelines:
-    1. Configuration System:
-       - Each component has a config object with properties
-       - Properties have a value and an input configuration
-       - Access config values in JavaScript using: window.componentConfig.properties.propertyName.value
-       - Properties can be grouped for UI organization using the 'group' field
 
-    2. Input Types Supported:
-       - text: Text input with optional placeholder
-       - number: Numeric input with optional min/max/step
-       - select: Dropdown with options array
-       - colorInput: Color picker that returns hex values
-       - checkbox: Boolean input that returns "true"/"false" as strings
-       - radio: Radio button group with options array
-       - range: Slider input with min/max/step
+1. JSON Schema Requirements:
+   - ALWAYS maintain the standard schema structure using a "properties" object
+   - Each property MUST have both "value" and "input" fields
+   - NEVER modify top-level component fields (name, description, version)
+   - Preserve existing property structure and only modify necessary values
+   - All changes must maintain backward compatibility
+   - Keep property names consistent with existing schema
 
-    3. Component Structure:
-       - HTML: Main component markup
-       - CSS: Component styles (automatically scoped to component)
-       - JavaScript: Component logic
-         - Runs in browser context
-         - Has access to window.componentConfig
-         - Should be wrapped in try/catch for error handling
-         - Can use external CDN resources (add <script> tags in HTML)
+2. Change Management Rules:
+   - Make iterative, additive changes rather than wholesale replacements
+   - Implement minimal changes to achieve requested functionality
+   - Preserve existing component aesthetics and structure
+   - Maintain HTML/CSS/JS structure unless changes are explicitly required
+   - Track significant changes in explanation for potential rollback
+   - Document any breaking changes or potential side effects
 
-    4. Best Practices:
-       - Use unique IDs and class names to avoid conflicts
-       - Implement error handling in JavaScript
-       - Provide reasonable default values
-       - Group related properties together
-       - Add descriptive labels for all inputs
-       - Support responsive design
-       - Include loading and error states
+3. Configuration System:
+   - Each component has a config object with properties
+   - Properties have a value and an input configuration
+   - Access config values in JavaScript using: window.componentConfig.properties.propertyName.value
+   - Properties can be grouped for UI organization using the 'group' field
+   - Maintain existing property groups when adding new properties
 
-    5. Example Property Groups:
-       - layout: width, height, padding, margin
-       - colors: background, text, borders
-       - typography: font size, family, weight
-       - behavior: intervals, animations, transitions
-       - content: text, labels, headings
-       - display-options: show/hide elements
+4. Input Types Supported:
+   - text: Text input with optional placeholder
+   - number: Numeric input with optional min/max/step
+   - select: Dropdown with options array
+   - colorInput: Color picker that returns hex values
+   - checkbox: Boolean input that returns "true"/"false" as strings
+   - radio: Radio button group with options array
+   - range: Slider input with min/max/step
 
-    Only include the COMPONENT_UPDATE structure when specifically updating the component. For general conversation or explanations, respond normally without this structure.`;
+5. Component Structure:
+   - HTML: Main component markup
+   - CSS: Component styles (automatically scoped to component)
+   - JavaScript: Component logic
+     - Runs in browser context
+     - Has access to window.componentConfig
+     - Should be wrapped in try/catch for error handling
+     - Can use external CDN resources (add <script> tags in HTML)
+
+6. Best Practices:
+   - Use unique IDs and class names to avoid conflicts
+   - Implement error handling in JavaScript
+   - Provide reasonable default values
+   - Group related properties together
+   - Add descriptive labels for all inputs
+   - Support responsive design
+   - Include loading and error states
+   - Preserve existing functionality when adding new features
+   - Document dependencies and external resources
+
+7. Example Property Groups:
+   - layout: width, height, padding, margin
+   - colors: background, text, borders
+   - typography: font size, family, weight
+   - behavior: intervals, animations, transitions
+   - content: text, labels, headings
+   - display-options: show/hide elements
+
+8. State Management:
+   - Maintain awareness of current component state
+   - Reference existing property values when making updates
+   - Preserve user-configured values during updates
+   - Support rollback of changes if needed
+   - Track component version history in explanations
+
+Only include the COMPONENT_UPDATE structure when specifically updating the component. For general conversation or explanations, respond normally without this structure.
+
+When making changes:
+1. First analyze the current component state
+2. Identify the minimal changes needed
+3. Preserve existing structure and functionality
+4. Document changes clearly in the explanation
+5. Include rollback instructions if needed`;
 
     const response = await callOpenAI([
       { role: "system", content: systemMessage },
-      { role: "user", content: currentComponent ? currentStateMessage : prompt }
+      { role: "user", content: currentStateMessage }
     ]);
     
     // Check if response contains a component update
     const componentUpdateMatch = response.match(/---COMPONENT_UPDATE---(.*?)---END_COMPONENT_UPDATE---/s);
-
+    console.log('Response:', response);
     if (componentUpdateMatch) {
+      console.log('Component update found:', componentUpdateMatch[1]);
       try {
         // Extract and parse the JSON from between the markers
         const componentJson = componentUpdateMatch[1].trim();
@@ -166,7 +208,10 @@ ${prompt}
 
         // Validate the response structure
         if (!parsedResponse.component || 
-            !parsedResponse.component.config ||
+            !parsedResponse.component.name ||
+            !parsedResponse.component.description ||
+            !parsedResponse.component.version ||
+            !parsedResponse.component.properties ||
             !parsedResponse.component.html ||
             !parsedResponse.component.css ||
             !parsedResponse.component.javascript) {

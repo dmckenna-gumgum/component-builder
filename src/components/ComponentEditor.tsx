@@ -239,6 +239,13 @@ export const ComponentEditor = () => {
                   if (componentData.javascript) setJavascript(componentData.javascript);
                   if (componentData.name) setName(componentData.name);
                 }}
+                currentComponent={{
+                  name,
+                  properties: JSON.parse(config || '{}'),
+                  html,
+                  css,
+                  javascript
+                }}
               />
             </Box>
           </VStack>
