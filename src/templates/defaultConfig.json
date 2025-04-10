@@ -1,0 +1,36 @@
+{
+  "name": "New Component",
+  "version": "1.0.0",
+  "description": "",
+  "properties": {
+    "textColor": {
+      "value": "#4974ca",
+      "input": {
+        "type": "colorInput",
+        "label": "Text Color"
+      }
+    },
+    "fontSize": {
+      "value": "24px",
+      "input": {
+        "type": "select",
+        "label": "Font Size",
+        "options": [
+          "12px",
+          "14px",
+          "16px",
+          "18px",
+          "20px",
+          "24px"
+        ]
+      }
+    },
+    "containerWidth": {
+      "value": "50",
+      "input": {
+        "type": "text",
+        "label": "container width"
+      }
+    }
+  }
+}
