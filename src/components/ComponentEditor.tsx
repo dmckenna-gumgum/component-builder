@@ -44,45 +44,6 @@ export const ComponentEditor = () => {
   const [css, setCss] = useState(defaultCss);
   const [javascript, setJavascript] = useState(defaultJavascript);
 
-  // Update config when name changes
-  useEffect(() => {
-    if (!name || !config) return;
-    
-    try {
-      const configObj = JSON.parse(config);
-      if (configObj.name !== name) {
-        configObj.name = name;
-        setConfig(JSON.stringify(configObj, null, 2));
-      }
-    } catch (e) {
-      // Don't reset the config if it's invalid, just log the error
-      console.error('Failed to update config with new name:', e);
-    }
-  }, [name, config]);
-
-  // Load component data when editing an existing component
-  useEffect(() => {
-    if (id !== 'new') {
-      const savedComponents = JSON.parse(localStorage.getItem('components') || '[]');
-      const component = savedComponents.find((c: ComponentData) => c.id === id);
-      
-      if (component) {
-        setName(component.name);
-        setConfig(component.config);
-        setHtml(component.html);
-        setCss(component.css);
-        setJavascript(component.javascript);
-      }
-    } else {
-      // Set default values for new component
-      setName('');
-      setConfig(defaultConfig);
-      setHtml(defaultHtml);
-      setCss(defaultCss);
-      setJavascript(defaultJavascript);
-    }
-  }, [id]);
-
   const handleSave = () => {
     if (!name.trim()) {
       toast({
@@ -127,6 +88,64 @@ export const ComponentEditor = () => {
 
     // Stay on the page after saving
   };
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        // Only handle save if the event target is not inside UIPreview
+        const uiPreview = document.querySelector('[data-ui-preview]');
+        if (!uiPreview?.contains(e.target as Node)) {
+          e.preventDefault();
+          handleSave();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSave]);
+
+  // Update config when name changes
+  useEffect(() => {
+    if (!name || !config) return;
+    
+    try {
+      const configObj = JSON.parse(config);
+      if (configObj.name !== name) {
+        configObj.name = name;
+        setConfig(JSON.stringify(configObj, null, 2));
+      }
+    } catch (e) {
+      // Don't reset the config if it's invalid, just log the error
+      console.error('Failed to update config with new name:', e);
+    }
+  }, [name, config]);
+
+  // Load component data when editing an existing component
+  useEffect(() => {
+    if (id !== 'new') {
+      const savedComponents = JSON.parse(localStorage.getItem('components') || '[]');
+      const component = savedComponents.find((c: ComponentData) => c.id === id);
+      
+      if (component) {
+        setName(component.name);
+        setConfig(component.config);
+        setHtml(component.html);
+        setCss(component.css);
+        setJavascript(component.javascript);
+      }
+    } else {
+      // Set default values for new component
+      setName('');
+      setConfig(defaultConfig);
+      setHtml(defaultHtml);
+      setCss(defaultCss);
+      setJavascript(defaultJavascript);
+    }
+  }, [id]);
+
+
 
   return (
     <Box height="100vh" width="100vw" overflow="hidden">
@@ -213,6 +232,28 @@ export const ComponentEditor = () => {
         {/* Preview Column */}
         <Panel defaultSize={50} minSize={30}>
           <VStack height="100%" spacing={4} p={4}>
+            {/* Component Preview */}
+            <Box
+              width="100%"
+              height="50%"
+              borderWidth="1px"
+              borderRadius="md"
+              display="flex"
+              flexDirection="column"
+              justifyContent="stretch"              
+              p={4}
+              overflow="auto"
+            >
+              <Text fontSize="lg" fontWeight="medium" mb={4}>
+                Component Preview
+              </Text>
+              <ComponentPreview
+                html={html} 
+                css={css} 
+                javascript={`window.componentConfig = ${config};\n${javascript}`} 
+                componentName={name || 'New Component'}
+              />
+            </Box>
             {/* UI Preview */}
             <Box
               width="100%"
@@ -222,31 +263,9 @@ export const ComponentEditor = () => {
               p={4}
               bg="white"
               overflow="auto"
+              data-ui-preview
             >
-              <Text fontSize="lg" fontWeight="medium" mb={4}>
-                UI Preview
-              </Text>
-              <UIPreview config={config} onConfigChange={setConfig} />
-            </Box>
-
-            {/* Component Preview */}
-            <Box
-              width="100%"
-              height="50%"
-              borderWidth="1px"
-              borderRadius="md"
-              p={4}
-              overflow="auto"
-            >
-              <Text fontSize="lg" fontWeight="medium" mb={4}>
-                Component Preview
-              </Text>
-              <ComponentPreview 
-                html={html} 
-                css={css} 
-                javascript={`window.componentConfig = ${config};\n${javascript}`} 
-                componentName={name || 'New Component'}
-              />
+              <UIPreview config={config} onConfigChange={setConfig} onSave={handleSave} />
             </Box>
           </VStack>
         </Panel>

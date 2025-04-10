@@ -2,13 +2,13 @@ export const defaultCss = `#square-container {
   position: relative;
   padding: 2rem;
   height: 400px;
+  box-sizing: border-box;
 }
 
 .square {
   position: relative;
   width: 100%;
   height: 100%;
-  background-color: rgb(240, 21, 21);
   display: flex;
   justify-content: center;
   align-items: center;

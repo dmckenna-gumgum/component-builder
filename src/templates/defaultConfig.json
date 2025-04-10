@@ -1,35 +1,93 @@
 {
   "name": "New Component",
   "version": "1.0.0",
-  "description": "",
+  "description": "This is a brand new studio component!",
   "properties": {
+    "content": {
+      "value": "This is a new component",
+      "input": {
+        "type": "text",
+        "label": "content"
+      }
+    },
+    "backgroundColor": {
+      "value": "#0d0808",
+      "input": {
+        "type": "colorInput",
+        "label": "BG Color"
+      }
+    },
     "textColor": {
-      "value": "#4974ca",
+      "value": "#99ff00",
       "input": {
         "type": "colorInput",
         "label": "Text Color"
       }
     },
     "fontSize": {
-      "value": "24px",
+      "value": "60px",
       "input": {
         "type": "select",
         "label": "Font Size",
         "options": [
-          "12px",
-          "14px",
-          "16px",
-          "18px",
-          "20px",
-          "24px"
+          "24px",
+          "36px",
+          "48px",
+          "54px",
+          "60px",
+          "72px"
         ]
       }
     },
-    "containerWidth": {
-      "value": "50",
+    "fontFamily": {
+      "value": "Verdana",
+      "input": {
+        "type": "select",
+        "label": "Font Size",
+        "options": [
+          "Verdana",
+          "Arial",
+          "monotype"
+        ]
+      }
+    },
+    "borderRadius": {
+      "value": "20",
       "input": {
         "type": "text",
-        "label": "container width"
+        "label": "corner radius"
+      }
+    },
+    "containerWidth": {
+      "value": "100",
+      "input": {
+        "type": "text",
+        "label": "container width",
+        "group": "width-controls"
+      }
+    },
+    "percentWidth": {
+      "value": "true",
+      "input": {
+        "type": "checkbox",
+        "label": "percent width",
+        "group": "width-controls"
+      }
+    },
+    "containerHeight": {
+      "value": "100",
+      "input": {
+        "type": "text",
+        "label": "container height",
+        "group": "height-controls"
+      }
+    },
+    "percentHeight": {
+      "value": "true",
+      "input": {
+        "type": "checkbox",
+        "label": "percent height",
+        "group": "height-controls"
       }
     }
   }

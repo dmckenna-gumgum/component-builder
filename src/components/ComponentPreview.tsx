@@ -54,7 +54,11 @@ export const ComponentPreview = ({ html, css, javascript, componentName = 'New C
       <html>
         <head>
           <style>
-            body { margin: 0; }
+            body, html {
+              height: 100%;
+              width: 100%;
+            }
+            body { margin: 0; padding: 0;}
             ${css}
           </style>
         </head>
@@ -137,14 +141,20 @@ export const ComponentPreview = ({ html, css, javascript, componentName = 'New C
   }, [updateIframe]);
 
   return (
-    <VStack height="100%" width="100%" borderWidth="1px" borderRadius="md" spacing={2}>
-      <Box position="relative" flex={1} width="100%" ref={containerRef}>
+    <VStack height="100%" width="100%" borderWidth="1px" borderRadius="md" spacing={2} overflow="hidden">
+      <Box position="relative" flex={1} width="100%" ref={containerRef} overflow="hidden">
         <iframe
           ref={iframeRef}
           title="Component Preview"
-          width="100%"
-          height="100%"
-          style={{ border: 'none', display: 'block' }}
+          style={{
+            border: 'none',
+            display: 'block',
+            width: '100%',
+            height: '100%',
+            position: 'absolute',
+            top: 0,
+            left: 0
+          }}
         />
       </Box>
       {error && (

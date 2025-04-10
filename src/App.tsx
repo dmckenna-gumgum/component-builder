@@ -44,7 +44,7 @@ function HomePage() {
           <Heading as="h1" size="2xl" textAlign="center" color="blue.600">
             Component Builder
           </Heading>
-          <ComponentGrid savedComponents={savedComponents} />
+          <ComponentGrid savedComponents={savedComponents} onUpdate={setSavedComponents} />
         </VStack>
       </Container>
     </Box>

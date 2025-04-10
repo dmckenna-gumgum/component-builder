@@ -8,8 +8,16 @@ const container = document.querySelector('#square-container');
 try {
     container.style.color = config.textColor.value;
     container.style.fontSize = config.fontSize.value;
-    container.style.width = config.containerWidth.value + "px";
+    container.style.fontFamily = config.fontFamily.value;
+    const widthUnits = config.percentWidth.value === 'true' ? '%' : 'px';
+    const heightUnits = config.percentHeight.value === 'true'  ? '%' : 'px';
+    container.style.width = config.containerWidth.value + widthUnits;
+    container.style.height = config.containerHeight.value + heightUnits;
+    container.style.backgroundColor = config.backgroundColor.value;
+    container.style.borderRadius = config.borderRadius.value + 'px';
+    container.querySelector('.text').innerHTML = config.content.value;
     console.log('success');
+
 } catch(e) {
     console.log(e);
 }`;
