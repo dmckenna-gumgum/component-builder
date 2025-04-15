@@ -13,7 +13,8 @@ import {
   RadioGroup,
   Stack,
 } from '@chakra-ui/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { debounce } from '../utils/debounce';
 
 interface PropertyInput {
   type: 'colorInput' | 'select' | 'text' | 'fileInput' | 'number' | 'range' | 'date' | 
@@ -70,16 +71,48 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onSave]);
 
+  const [error, setError] = useState<string | null>(null);
+
+  // Cleanup when unmounting
   useEffect(() => {
-    if (!config) return;
+    return () => {
+      setParsedConfig(null);
+      setError(null);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!config) {
+      setParsedConfig(null);
+      return;
+    }
     
     try {
       const parsed = JSON.parse(config);
-      if (!parsed || typeof parsed !== 'object') throw new Error('Invalid config format');
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Invalid JSON format');
+      }
+      
+      // Validate required fields
+      if (!parsed.name || typeof parsed.name !== 'string') {
+        throw new Error('Missing or invalid "name" field');
+      }
+      if (!parsed.version || typeof parsed.version !== 'string') {
+        throw new Error('Missing or invalid "version" field');
+      }
+      if (!parsed.description || typeof parsed.description !== 'string') {
+        throw new Error('Missing or invalid "description" field');
+      }
+      if (!parsed.properties || typeof parsed.properties !== 'object') {
+        throw new Error('Missing or invalid "properties" field');
+      }
+
       setParsedConfig(parsed);
+      setError(null);
     } catch (error) {
       console.error('Failed to parse config:', error);
-      // Keep the previous config if it exists, don't reset to default
+      setError(error instanceof Error ? error.message : 'Invalid JSON');
+      // Keep the previous config if it exists
       setParsedConfig(prev => prev);
     }
   }, [config]);
@@ -92,7 +125,8 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
     return true;
   };
 
-  const handlePropertyChange = (propertyName: string, newValue: string) => {
+  // Helper function to update config
+  const updateConfig = useCallback((propertyName: string, newValue: string) => {
     if (!parsedConfig) return;
 
     // Ensure we're not modifying top-level fields through properties
@@ -117,10 +151,48 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
 
     setParsedConfig(newConfig);
     onConfigChange(JSON.stringify(newConfig, null, 2));
-  };
+  }, [parsedConfig, onConfigChange]);
+
+  // Debounced handler for text inputs, sliders, and color pickers
+  const handleDebouncedChange = useCallback(
+    debounce((propertyName: string, newValue: string) => {
+      updateConfig(propertyName, newValue);
+    }, 250),
+    [updateConfig]
+  );
+
+  // Immediate handler for select, radio, checkbox
+  const handleImmediateChange = useCallback(
+    (propertyName: string, newValue: string) => {
+      updateConfig(propertyName, newValue);
+    },
+    [updateConfig]
+  );
+
+  // Show error message if config is invalid
+  if (error) {
+    return (
+      <Box p={4} bg="red.50" color="red.600" borderRadius="md" fontSize="sm" fontFamily="mono">
+        <Text fontWeight="bold" mb={2}>Configuration Error:</Text>
+        <Text>{error}</Text>
+        <Text mt={2} fontSize="xs" color="red.500">
+          Please fix the JSON formatting before the preview can be displayed.
+        </Text>
+      </Box>
+    );
+  }
 
   // Only show UI if we have a valid config structure
-  if (!parsedConfig || !validateConfigStructure(parsedConfig)) return null;
+  if (!parsedConfig || !validateConfigStructure(parsedConfig)) {
+    return (
+      <Box p={4} bg="orange.50" color="orange.600" borderRadius="md" fontSize="sm" fontFamily="mono">
+        <Text fontWeight="bold" mb={2}>Invalid Configuration Structure</Text>
+        <Text>
+          The configuration must include name, version, description, and a properties object.
+        </Text>
+      </Box>
+    );
+  }
 
   // Helper function to group properties by their group
   const groupProperties = (properties: ConfigProperties) => {
@@ -274,7 +346,7 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
                           <Input
                             type="color"
                             value={property.value}
-                            onChange={(e) => handlePropertyChange(propertyName, e.target.value)}
+                            onChange={(e) => handleDebouncedChange(propertyName, e.target.value)}
                             width="60px"
                             height="35px"
                             padding={1}
@@ -288,7 +360,7 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
                         <Select
                           size="sm"
                           value={property.value}
-                          onChange={(e) => handlePropertyChange(propertyName, e.target.value)}
+                          onChange={(e) => handleImmediateChange(propertyName, e.target.value)}
                           width={getInputWidth(property)}
                         >
                           {property.input.options.map((option) => (
@@ -306,7 +378,7 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
                           size="sm"
                           type={property.input.type}
                           value={property.value}
-                          onChange={(e) => handlePropertyChange(propertyName, e.target.value)}
+                          onChange={(e) => handleDebouncedChange(propertyName, e.target.value)}
                           placeholder={property.input.placeholder}
                           width={getInputWidth(property)}
                         />
@@ -317,7 +389,7 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
                           size="sm"
                           type={property.input.type}
                           value={property.value}
-                          onChange={(e) => handlePropertyChange(propertyName, e.target.value)}
+                          onChange={(e) => handleDebouncedChange(propertyName, e.target.value)}
                           min={property.input.min}
                           max={property.input.max}
                           step={property.input.step}
@@ -332,7 +404,7 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
                           size="sm"
                           type={property.input.type}
                           value={property.value}
-                          onChange={(e) => handlePropertyChange(propertyName, e.target.value)}
+                          onChange={(e) => handleImmediateChange(propertyName, e.target.value)}
                           min={property.input.min}
                           max={property.input.max}
                           width={getInputWidth(property)}
@@ -343,14 +415,14 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
                         <Switch
                           size="md"
                           isChecked={property.value === 'true'}
-                          onChange={(e) => handlePropertyChange(propertyName, e.target.checked.toString())}
+                          onChange={(e) => handleImmediateChange(propertyName, e.target.checked.toString())}
                         />
               )}
 
                       {property.input.type === 'radio' && property.input.options && (
                         <RadioGroup
                           value={property.value}
-                          onChange={(value) => handlePropertyChange(propertyName, value)}
+                          onChange={(value) => handleImmediateChange(propertyName, value)}
                         >
                           <Stack direction="column" spacing={2}>
                             {property.input.options.map((option) => (
@@ -373,7 +445,7 @@ export const UIPreview = ({ config, onConfigChange, onSave }: UIPreviewProps) =>
                             if (file) {
                               const reader = new FileReader();
                               reader.onloadend = () => {
-                                handlePropertyChange(propertyName, reader.result as string);
+                                handleImmediateChange(propertyName, reader.result as string);
                               };
                               reader.readAsDataURL(file);
                             }

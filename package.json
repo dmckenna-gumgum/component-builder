@@ -39,7 +39,7 @@
   "scripts": {
     "build:server": "tsc -p server/tsconfig.json",
     "dev:server": "cd server && nodemon --exec ts-node index.ts",
-    "start": "react-scripts start",
+    "start": "set PORT=3000&& react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -64,6 +64,7 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.9",
+    "prettier": "^3.5.3",
     "ts-node": "^10.9.2"
   }
 }

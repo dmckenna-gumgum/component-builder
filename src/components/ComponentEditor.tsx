@@ -17,8 +17,9 @@ import {
 import { ArrowBackIcon } from '@chakra-ui/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { useState, useEffect } from 'react';
-import { CodeEditor } from './CodeEditor';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { debounce } from '../utils/debounce';
+import { CodeEditor, EditorRef } from './CodeEditor';
 import { ComponentPreview } from './ComponentPreview';
 import { UIPreview } from './UIPreview';
 import { defaultConfig, defaultHtml, defaultCss, defaultJavascript } from '../templates';
@@ -35,15 +36,153 @@ interface ComponentData {
 }
 
 export const ComponentEditor = () => {
-  const { id = 'new' } = useParams<{ id: string }>();
+  // Editor refs
+  const configEditorRef = useRef<EditorRef>(null);
+  const htmlEditorRef = useRef<EditorRef>(null);
+  const cssEditorRef = useRef<EditorRef>(null);
+  const jsEditorRef = useRef<EditorRef>(null);
+  const { id: urlId = 'new' } = useParams<{ id: string }>();
+  const [componentId, setComponentId] = useState(urlId);
   const toast = useToast();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
-  const [config, setConfig] = useState(defaultConfig);
-  const [html, setHtml] = useState(defaultHtml);
-  const [css, setCss] = useState(defaultCss);
-  const [javascript, setJavascript] = useState(defaultJavascript);
+  const [config, setConfigImmediate] = useState('');
+  const [html, setHtmlImmediate] = useState('');
+  const [css, setCssImmediate] = useState('');
+  const [javascript, setJavascriptImmediate] = useState('');
+  const [editorsReady, setEditorsReady] = useState(0);
+
+  // Load saved component data
+  useEffect(() => {
+    shouldDebounce.current = false;
+    
+    if (urlId === 'new') {
+      // Generate a new ID only when creating a new component
+      setComponentId(Date.now().toString());
+      // Set default values immediately
+      setName('');
+      setConfigImmediate(defaultConfig);
+      setHtmlImmediate(defaultHtml);
+      setCssImmediate(defaultCss);
+      setJavascriptImmediate(defaultJavascript);
+      return;
+    }
+
+    try {
+      const savedComponents = JSON.parse(localStorage.getItem('components') || '[]');
+      const savedComponent = savedComponents.find((c: ComponentData) => c.id === urlId);
+      
+      if (savedComponent) {
+        console.log('Loading saved component:', savedComponent);
+        // Load all values immediately
+        setName(savedComponent.name);
+        setConfigImmediate(savedComponent.config);
+        setHtmlImmediate(savedComponent.html);
+        setCssImmediate(savedComponent.css);
+        setJavascriptImmediate(savedComponent.javascript);
+      } else {
+        console.error('Component not found:', urlId);
+        toast({
+          title: 'Error',
+          description: 'Component not found',
+          status: 'error',
+          duration: 3000,
+        });
+        navigate('/');
+      }
+    } catch (error) {
+      console.error('Error loading component:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load component',
+        status: 'error',
+        duration: 3000,
+      });
+      navigate('/');
+    }
+  }, [urlId, navigate, toast]);
+
+  // Track editor readiness
+  const onEditorReady = useCallback(() => {
+    setEditorsReady(prev => prev + 1);
+  }, []);
+
+  // Format all editors once they're all ready and enable debouncing
+  useEffect(() => {
+    if (editorsReady === 4) { // All editors are ready
+      // Format code
+      configEditorRef.current?.editor?.formatCode?.();
+      htmlEditorRef.current?.editor?.formatCode?.();
+      cssEditorRef.current?.editor?.formatCode?.();
+      jsEditorRef.current?.editor?.formatCode?.();
+      // Enable debouncing for future updates
+      shouldDebounce.current = true;
+    }
+  }, [editorsReady]);
+
+  // Track if we should debounce updates
+  const shouldDebounce = useRef(false);
+
+  // Create debounced preview updater with 1 second delay
+  const updatePreviews = useCallback(
+    debounce(() => {
+      if (!shouldDebounce.current) return;
+      console.log('Updating previews after 1s of inactivity...');
+      // Get current values from editors
+      const newConfig = configEditorRef.current?.editor?.getValue() || '';
+      const newHtml = htmlEditorRef.current?.editor?.getValue() || '';
+      const newCss = cssEditorRef.current?.editor?.getValue() || '';
+      const newJs = jsEditorRef.current?.editor?.getValue() || '';
+
+      // Only update if the config is valid JSON
+      try {
+        // Validate config JSON
+        JSON.parse(newConfig);
+        // If validation passes, update all values
+        setConfigImmediate(newConfig);
+        setHtmlImmediate(newHtml);
+        setCssImmediate(newCss);
+        setJavascriptImmediate(newJs);
+      } catch (error) {
+        console.log('Invalid JSON in config, skipping preview update');
+      }
+    }, 1000), // Wait 1s after last change
+    []
+  );
+
+  // Immediate setters that queue debounced preview updates
+  const setConfig = useCallback((value: string) => {
+    setConfigImmediate(value);
+    if (editorsReady === 4) {
+      configEditorRef.current?.editor?.formatCode?.();
+      updatePreviews();
+    }
+  }, [editorsReady, updatePreviews]);
+
+  const setHtml = useCallback((value: string) => {
+    setHtmlImmediate(value);
+    if (editorsReady === 4) {
+      htmlEditorRef.current?.editor?.formatCode?.();
+      updatePreviews();
+    }
+  }, [editorsReady, updatePreviews]);
+
+  const setCss = useCallback((value: string) => {
+    setCssImmediate(value);
+    if (editorsReady === 4) {
+      cssEditorRef.current?.editor?.formatCode?.();
+      updatePreviews();
+    }
+  }, [editorsReady, updatePreviews]);
+
+  const setJavascript = useCallback((value: string) => {
+    setJavascriptImmediate(value);
+    if (editorsReady === 4) {
+      jsEditorRef.current?.editor?.formatCode?.();
+      updatePreviews();
+    }
+  }, [editorsReady, updatePreviews]);
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -57,7 +196,7 @@ export const ComponentEditor = () => {
     }
 
     const componentData: ComponentData = {
-      id: id === 'new' ? Date.now().toString() : id,
+      id: componentId,
       name: name.trim(),
       config,
       html,
@@ -66,17 +205,21 @@ export const ComponentEditor = () => {
       lastModified: new Date().toISOString(),
     };
 
+    console.log(componentData);
+
     // Get existing components or initialize empty array
     const savedComponents = JSON.parse(localStorage.getItem('components') || '[]');
     
     // Update or add new component
     const componentIndex = savedComponents.findIndex((c: ComponentData) => c.id === componentData.id);
+    console.log('found existing component at index', componentIndex)
     if (componentIndex >= 0) {
       savedComponents[componentIndex] = componentData;
+      console.log('updated existing component at index', savedComponents[componentIndex]);
     } else {
       savedComponents.push(componentData);
     }
-
+    console.log(savedComponents);
     // Save back to localStorage
     localStorage.setItem('components', JSON.stringify(savedComponents));
 
@@ -125,9 +268,9 @@ export const ComponentEditor = () => {
 
   // Load component data when editing an existing component
   useEffect(() => {
-    if (id !== 'new') {
+    if (urlId !== 'new') {
       const savedComponents = JSON.parse(localStorage.getItem('components') || '[]');
-      const component = savedComponents.find((c: ComponentData) => c.id === id);
+      const component = savedComponents.find((c: ComponentData) => c.id === urlId);
       
       if (component) {
         setName(component.name);
@@ -144,9 +287,23 @@ export const ComponentEditor = () => {
       setCss(defaultCss);
       setJavascript(defaultJavascript);
     }
-  }, [id]);
+  }, [urlId]);
 
 
+
+  // Cleanup when navigating away
+  useEffect(() => {
+    return () => {
+      // Clear state when unmounting
+      setName('');
+      setConfigImmediate('');
+      setHtmlImmediate('');
+      setCssImmediate('');
+      setJavascriptImmediate('');
+      setEditorsReady(0);
+      shouldDebounce.current = false;
+    };
+  }, []);
 
   return (
     <Box height="100vh" width="100vw" overflow="hidden">
@@ -197,32 +354,44 @@ export const ComponentEditor = () => {
               </TabList>
 
               <TabPanels flex={1} overflow="auto">
-                <TabPanel height="100%" padding={0}>
+                  <TabPanel height="100%" padding={0}>
+                    {/* JSON Editor */}
                   <CodeEditor
+                    ref={configEditorRef}
                     language="json"
                     value={config}
                     onChange={(value) => setConfig(value || '')}
+                    onMount={onEditorReady}
                   />
                 </TabPanel>
                 <TabPanel height="100%" padding={0}>
+                  {/* HTML Editor */}
                   <CodeEditor
+                    ref={htmlEditorRef}
                     language="html"
                     value={html}
                     onChange={(value) => setHtml(value || '')}
+                    onMount={onEditorReady}
                   />
                 </TabPanel>
                 <TabPanel height="100%" padding={0}>
+                  {/* CSS Editor */}
                   <CodeEditor
+                    ref={cssEditorRef}
                     language="css"
                     value={css}
                     onChange={(value) => setCss(value || '')}
+                    onMount={onEditorReady}
                   />
                 </TabPanel>
                 <TabPanel height="100%" padding={0}>
+                  {/* JavaScript Editor */}
                   <CodeEditor
+                    ref={jsEditorRef}
                     language="javascript"
                     value={javascript}
                     onChange={(value) => setJavascript(value || '')}
+                    onMount={onEditorReady}
                   />
                 </TabPanel>
               </TabPanels>
@@ -241,7 +410,13 @@ export const ComponentEditor = () => {
                 }}
                 currentComponent={{
                   name,
-                  properties: JSON.parse(config || '{}'),
+                  properties: (() => {
+                    try {
+                      return JSON.parse(config || '{}');
+                    } catch (error) {
+                      return {};
+                    }
+                  })(),
                   html,
                   css,
                   javascript
@@ -278,7 +453,7 @@ export const ComponentEditor = () => {
                 componentName={name || 'New Component'}
               />
             </Box>
-            {/* UI Preview */}
+            {/* UI Preview
             <Box
               width="100%"
               height="50%"
@@ -290,7 +465,7 @@ export const ComponentEditor = () => {
               data-ui-preview
             >
               <UIPreview config={config} onConfigChange={setConfig} onSave={handleSave} />
-            </Box>
+            </Box> */}
           </VStack>
         </Panel>
       </PanelGroup>
